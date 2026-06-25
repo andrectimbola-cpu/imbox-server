@@ -1,17 +1,12 @@
 // =====================================================
 // INBOX WHATSAPP - Serviço (Railway)
 // =====================================================
-// 1. Webhook da Z-API: recebe mensagens (texto e mídia),
-//    cria/atualiza a conversa e grava no Supabase.
-// 2. Agendador: envia mensagens agendadas na hora marcada.
-// =====================================================
-
 const express = require('express');
 const app = express();
-app.use(express.json({ limit: '25mb' })); // mídias podem ser grandes
+app.use(express.json({ limit: '25mb' }));
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;        // service_role
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const ZAPI_INSTANCE = process.env.ZAPI_INSTANCE;
 const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
 const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
@@ -33,17 +28,16 @@ async function zapiTexto(tel,msg){
 
 // =====================================================
 // 1. WEBHOOK — recebe mensagens
-// Z-API → Webhook "Ao receber" → https://SEU-APP.railway.app/webhook
 // =====================================================
 app.post('/webhook', async (req,res)=>{
   res.sendStatus(200);
   try{
     const d = req.body;
-    if (d.fromMe) return;                       // ignora o que você mesmo manda
+    const ehMinha = !!d.fromMe;
     const tel = limparTel(d.phone);
     if(!tel) return;
+    if (ehMinha && (d.fromApi || d.fromAPI)) return;
 
-    // Identifica tipo e conteúdo
     let tipo='texto', conteudo='', midia_url=null;
     if(d.text?.message){ tipo='texto'; conteudo=d.text.message; }
     else if(d.image){ tipo='imagem'; midia_url=d.image.imageUrl; conteudo=d.image.caption||''; }
@@ -57,22 +51,22 @@ app.post('/webhook', async (req,res)=>{
     const foto = d.senderPhoto || null;
     const preview = tipo==='texto' ? conteudo : '📎 '+tipo;
     const agora = new Date().toISOString();
+    const direcao = ehMinha ? 'enviada' : 'recebida';
 
-    // Acha ou cria a conversa
     let conv = (await sbGet(`conversas?telefone=eq.${tel}`))[0];
     if(!conv){
-      const novo = await sbPost('conversas',{telefone:tel,nome,foto,ultima_mensagem:preview,ultima_em:agora,nao_lidas:1});
+      const novo = await sbPost('conversas',{telefone:tel,nome,foto,ultima_mensagem:preview,ultima_em:agora,nao_lidas: ehMinha?0:1});
       conv = Array.isArray(novo)?novo[0]:novo;
     } else {
       await sbPatch('conversas',`id=eq.${conv.id}`,{
         ultima_mensagem:preview, ultima_em:agora,
-        nao_lidas:(conv.nao_lidas||0)+1,
+        nao_lidas: ehMinha ? (conv.nao_lidas||0) : (conv.nao_lidas||0)+1,
         ...(foto&&!conv.foto?{foto}:{}),
         ...(conv.nome===conv.telefone&&nome!==tel?{nome}:{})
       });
     }
-    await sbPost('mensagens',{conversa_id:conv.id,telefone:tel,direcao:'recebida',tipo,conteudo,midia_url,zaapi_id:d.messageId||null});
-    console.log(`Recebida de ${nome}: ${preview}`);
+    await sbPost('mensagens',{conversa_id:conv.id,telefone:tel,direcao,tipo,conteudo,midia_url,zaapi_id:d.messageId||null});
+    console.log(`${direcao==='enviada'?'Enviada por mim':'Recebida'} (${nome}): ${preview}`);
   }catch(e){ console.error('Erro webhook:',e.message); }
 });
 
@@ -88,7 +82,6 @@ async function processarAgendamentos(){
       try{
         await zapiTexto(a.telefone,a.conteudo);
         await sbPatch('agendamentos',`id=eq.${a.id}`,{enviada:true});
-        // registra na conversa (cria se necessário)
         const tel=limparTel(a.telefone);
         let conv=(await sbGet(`conversas?telefone=eq.${tel}`))[0];
         if(!conv){const n=await sbPost('conversas',{telefone:tel,nome:a.nome||tel,ultima_mensagem:a.conteudo,ultima_em:new Date().toISOString()});conv=Array.isArray(n)?n[0]:n;}
@@ -100,7 +93,7 @@ async function processarAgendamentos(){
     }
   }catch(e){ console.error('Erro agendador:',e.message); }
 }
-setInterval(processarAgendamentos, 60*1000); // checa a cada 1 min
+setInterval(processarAgendamentos, 60*1000);
 processarAgendamentos();
 
 app.get('/',(req,res)=>res.send('Inbox WhatsApp — serviço ativo'));
