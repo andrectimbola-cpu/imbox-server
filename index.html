@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inbox — Gerencial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --preto:#0d0d0d; --grafite:#161616; --carvao:#202020; --carvao2:#282828;
+    --ouro:#d4af37; --ouro-claro:#e8c860; --ouro-escuro:#9c7c1f;
+    --cinza:#8a8a8a; --cinza-claro:#bdbdbd; --branco:#f4f1ea;
+    --verde:#2e9e5b; --vermelho:#c0392b; --azul:#2f6fb0;
+    --borda:#2e2e2e; --bolha-env:#2a3f30; --bolha-rec:#242424;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Inter',sans-serif;background:var(--preto);color:var(--branco);overflow:hidden}
+
+  .app{display:flex;height:100vh}
+
+  /* ---------- SIDEBAR (lista de conversas) ---------- */
+  .sidebar{
+    width:340px;flex-shrink:0;background:var(--grafite);
+    border-right:1px solid var(--borda);display:flex;flex-direction:column;
+  }
+  .sb-head{
+    padding:14px 16px;border-bottom:1px solid var(--borda);
+    display:flex;align-items:center;justify-content:space-between;
+    background:linear-gradient(90deg,#0d0d0d,#161616);
+  }
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-mark{width:34px;height:34px;border:2px solid var(--ouro);border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Anton';font-size:18px;color:var(--ouro)}
+  .logo h1{font-family:'Anton';font-size:16px;letter-spacing:.5px;font-weight:400}
+  .logo span{color:var(--ouro)}
+  .sb-actions{display:flex;gap:8px}
+  .icon-only{background:var(--carvao);border:1px solid var(--borda);color:var(--cinza-claro);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .icon-only:hover{border-color:var(--ouro);color:var(--ouro)}
+  .sb-search{padding:10px 14px;border-bottom:1px solid var(--borda)}
+  .sb-search input{width:100%;background:var(--preto);border:1px solid var(--borda);border-radius:20px;padding:9px 14px;color:var(--branco);font-size:13px;font-family:'Inter'}
+  .sb-search input:focus{outline:none;border-color:var(--ouro)}
+  .conv-list{flex:1;overflow-y:auto}
+  .conv{display:flex;gap:11px;padding:12px 14px;cursor:pointer;border-bottom:1px solid #1e1e1e;transition:.12s;align-items:center}
+  .conv:hover{background:var(--carvao)}
+  .conv.active{background:var(--carvao2);border-left:3px solid var(--ouro)}
+  .avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--ouro-escuro),var(--carvao));flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--preto);font-size:16px;overflow:hidden}
+  .avatar img{width:100%;height:100%;object-fit:cover}
+  .conv-info{flex:1;min-width:0}
+  .conv-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .conv-nome{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .conv-hora{font-size:11px;color:var(--cinza);flex-shrink:0}
+  .conv-prev{font-size:12px;color:var(--cinza);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .badge{background:var(--ouro);color:var(--preto);font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0}
+  .empty-list{padding:40px 20px;text-align:center;color:var(--cinza);font-size:13px}
+
+  /* ---------- CHAT ---------- */
+  .chat{flex:1;display:flex;flex-direction:column;background:var(--preto);position:relative}
+  .chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--cinza);gap:14px}
+  .chat-empty .logo-mark{width:60px;height:60px;font-size:30px;opacity:.4}
+  .chat-head{padding:13px 18px;border-bottom:1px solid var(--borda);display:flex;align-items:center;gap:12px;background:var(--grafite)}
+  .chat-head .avatar{width:40px;height:40px;font-size:15px}
+  .chat-head-info h2{font-size:15px;font-weight:600}
+  .chat-head-info small{font-size:11px;color:var(--cinza)}
+  .chat-head-actions{margin-left:auto;display:flex;gap:8px}
+  .chat-body{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:8px;background:linear-gradient(rgba(13,13,13,.96),rgba(13,13,13,.96))}
+  .bolha{max-width:62%;padding:9px 13px;border-radius:12px;font-size:14px;line-height:1.45;word-break:break-word;position:relative}
+  .bolha.enviada{background:var(--bolha-env);align-self:flex-end;border-bottom-right-radius:3px}
+  .bolha.recebida{background:var(--bolha-rec);border:1px solid var(--borda);align-self:flex-start;border-bottom-left-radius:3px}
+  .bolha small{display:block;font-size:9px;opacity:.55;margin-top:4px;text-align:right}
+  .bolha img,.bolha video{max-width:100%;border-radius:8px;margin-bottom:5px;display:block}
+  .bolha audio{width:240px;margin-bottom:4px}
+  .bolha .doc{display:flex;align-items:center;gap:8px;padding:8px;background:rgba(0,0,0,.3);border-radius:8px;margin-bottom:4px}
+  .date-sep{align-self:center;background:var(--carvao);color:var(--cinza-claro);font-size:11px;padding:4px 12px;border-radius:10px;margin:8px 0}
+
+  .composer{padding:12px 16px;border-top:1px solid var(--borda);background:var(--grafite);display:flex;gap:10px;align-items:flex-end}
+  .composer textarea{flex:1;background:var(--preto);border:1px solid var(--borda);border-radius:22px;padding:11px 16px;color:var(--branco);font-family:'Inter';font-size:14px;resize:none;max-height:120px;line-height:1.4}
+  .composer textarea:focus{outline:none;border-color:var(--ouro)}
+  .send-btn{background:var(--ouro);color:var(--preto);border:none;width:44px;height:44px;border-radius:50%;cursor:pointer;font-size:18px;flex-shrink:0;transition:.15s;display:flex;align-items:center;justify-content:center}
+  .send-btn:hover{background:var(--ouro-claro)}
+  .send-btn:disabled{opacity:.4;cursor:not-allowed}
+  .attach-btn{background:var(--carvao);color:var(--cinza-claro);border:1px solid var(--borda);width:44px;height:44px;border-radius:50%;cursor:pointer;font-size:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .attach-btn:hover{border-color:var(--ouro);color:var(--ouro)}
+
+  /* ---------- MODAIS ---------- */
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100;align-items:center;justify-content:center;padding:20px}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--grafite);border:1px solid var(--ouro-escuro);border-radius:14px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto}
+  .modal-head{padding:16px 20px;border-bottom:1px solid var(--borda);display:flex;justify-content:space-between;align-items:center}
+  .modal-head h2{font-family:'Anton';font-size:17px;font-weight:400;letter-spacing:.5px}
+  .modal-body{padding:20px}
+  .close{background:none;border:none;color:var(--cinza);font-size:22px;cursor:pointer}
+  .close:hover{color:var(--branco)}
+  label{display:block;font-size:12px;color:var(--cinza-claro);margin:12px 0 5px;text-transform:uppercase;letter-spacing:.5px}
+  label:first-child{margin-top:0}
+  input,textarea,select{width:100%;background:var(--preto);border:1px solid var(--borda);border-radius:8px;padding:10px 12px;color:var(--branco);font-family:'Inter';font-size:14px}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ouro)}
+  textarea{resize:vertical;min-height:80px}
+  .modal-footer{padding:14px 20px;border-top:1px solid var(--borda);display:flex;gap:10px;justify-content:flex-end}
+  .btn-ouro{background:var(--ouro);color:var(--preto);border:none;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer;font-family:'Inter';font-size:13px}
+  .btn-ouro:hover{background:var(--ouro-claro)}
+  .btn-ghost{background:transparent;color:var(--cinza-claro);border:1px solid var(--borda);border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer;font-family:'Inter';font-size:13px}
+  .btn-ghost:hover{border-color:var(--ouro);color:var(--branco)}
+  .row{display:flex;gap:10px}.row>div{flex:1}
+  .muted{color:var(--cinza);font-size:12px;line-height:1.5}
+  .agend-item{background:var(--carvao);border:1px solid var(--borda);border-radius:8px;padding:12px;margin-bottom:10px}
+  .agend-item b{color:var(--ouro)}
+
+  /* LOGIN */
+  .login-bg{position:fixed;inset:0;background:var(--preto);z-index:300;display:flex;align-items:center;justify-content:center}
+  .login-box{background:var(--grafite);border:1px solid var(--ouro-escuro);border-radius:14px;padding:34px;width:330px;text-align:center}
+  .login-box .logo-mark{margin:0 auto 18px;width:44px;height:44px;font-size:24px}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--carvao);border:1px solid var(--ouro);color:var(--branco);padding:12px 22px;border-radius:10px;z-index:200;font-size:14px;display:none}
+  .toast.show{display:block}
+
+  @media(max-width:760px){
+    .sidebar{width:100%;position:absolute;inset:0;z-index:10}
+    .sidebar.hidden-mobile{display:none}
+    .chat{position:absolute;inset:0}
+    .chat.hidden-mobile{display:none}
+    .back-btn{display:flex !important}
+  }
+  .back-btn{display:none;background:var(--carvao);border:1px solid var(--borda);color:var(--branco);width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:18px;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-bg" id="loginBg">
+  <div class="login-box">
+    <div class="logo-mark">G</div>
+    <h2 style="font-family:'Anton';font-weight:400;margin-bottom:6px">INBOX</h2>
+    <p class="muted" style="margin-bottom:18px">Acesso restrito</p>
+    <input type="password" id="senhaInput" placeholder="Senha" onkeydown="if(event.key==='Enter')entrar()">
+    <button class="btn-ouro" style="width:100%;margin-top:14px" onclick="entrar()">Entrar</button>
+  </div>
+</div>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="logo"><div class="logo-mark">G</div><h1>IN<span>BOX</span></h1></div>
+      <div class="sb-actions">
+        <button class="icon-only" title="Agendamentos" onclick="abrirAgendamentos()">🕑</button>
+        <button class="icon-only" title="Nova conversa" onclick="abrirNovaConversa()">✎</button>
+      </div>
+    </div>
+    <div class="sb-search"><input id="busca" placeholder="Buscar conversa..." oninput="renderConversas()"></div>
+    <div class="conv-list" id="convList"></div>
+  </div>
+
+  <!-- CHAT -->
+  <div class="chat" id="chat">
+    <div class="chat-empty" id="chatEmpty">
+      <div class="logo-mark">G</div>
+      <p>Selecione uma conversa para começar</p>
+    </div>
+    <div id="chatArea" style="display:none;flex:1;flex-direction:column;height:100%">
+      <div class="chat-head">
+        <button class="back-btn" onclick="voltarLista()">←</button>
+        <div class="avatar" id="chatAvatar"></div>
+        <div class="chat-head-info">
+          <h2 id="chatNome"></h2>
+          <small id="chatTel"></small>
+        </div>
+        <div class="chat-head-actions">
+          <button class="icon-only" title="Agendar mensagem" onclick="abrirAgendar()">🕑</button>
+        </div>
+      </div>
+      <div class="chat-body" id="chatBody"></div>
+      <div class="composer">
+        <input type="file" id="fileInput" style="display:none" accept="image/*,video/*,application/pdf" onchange="enviarMidia()">
+        <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
+        <textarea id="msgInput" rows="1" placeholder="Digite uma mensagem..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarTexto()}" oninput="autoGrow(this)"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="enviarTexto()">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOVA CONVERSA -->
+<div class="modal-bg" id="modalNova">
+  <div class="modal">
+    <div class="modal-head"><h2>Nova conversa</h2><button class="close" onclick="fechar('modalNova')">×</button></div>
+    <div class="modal-body">
+      <label>Nome</label><input id="nc_nome" placeholder="Nome do contato">
+      <label>WhatsApp (com DDD)</label><input id="nc_tel" placeholder="46 99999-9999">
+      <label>Primeira mensagem</label><textarea id="nc_msg" placeholder="Mensagem inicial..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="fechar('modalNova')">Cancelar</button>
+      <button class="btn-ouro" onclick="iniciarConversa()">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AGENDAR -->
+<div class="modal-bg" id="modalAgendar">
+  <div class="modal">
+    <div class="modal-head"><h2>Agendar mensagem</h2><button class="close" onclick="fechar('modalAgendar')">×</button></div>
+    <div class="modal-body">
+      <p class="muted" id="agendarPara" style="margin-bottom:12px"></p>
+      <label>Mensagem</label><textarea id="ag_msg" placeholder="Texto da mensagem (opcional se anexar mídia)..."></textarea>
+      <label>Anexar mídia (imagem, vídeo ou PDF)</label>
+      <input type="file" id="ag_file" accept="image/*,video/*,application/pdf" onchange="prepararMidiaAgendada()">
+      <p class="muted" id="ag_fileInfo" style="margin-top:6px"></p>
+      <div class="row">
+        <div><label>Data</label><input type="date" id="ag_data"></div>
+        <div><label>Hora</label><input type="time" id="ag_hora"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="fechar('modalAgendar')">Cancelar</button>
+      <button class="btn-ouro" onclick="salvarAgendamento()">Agendar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LISTA AGENDAMENTOS -->
+<div class="modal-bg" id="modalAgList">
+  <div class="modal">
+    <div class="modal-head"><h2>Mensagens agendadas</h2><button class="close" onclick="fechar('modalAgList')">×</button></div>
+    <div class="modal-body" id="agListBody"></div>
+    <div class="modal-footer"><button class="btn-ghost" onclick="fechar('modalAgList')">Fechar</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ CONFIG ============
+const SUPABASE_URL = 'https://ixnljdbchecdowctrjoj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_FCDVfQEmtcr49MA1OdNQlg_s8-mz0nc';
+const ZAPI_INSTANCE = '3F5237F06DFBF14848C7E23A10185B7E';
+const ZAPI_TOKEN = '4034AD344C3B3D124E193F48';
+const ZAPI_CLIENT_TOKEN = 'F06a7788608514fab81cffe9a28b615e4S';
+const SENHA = 'inbox2026';
+// ================================
+
+let conversas = [];
+let conversaAtual = null;
+let pollInterval = null;
+
+function entrar(){
+  if(document.getElementById('senhaInput').value === SENHA){
+    document.getElementById('loginBg').style.display='none';
+    iniciar();
+  } else toast('Senha incorreta');
+}
+
+// ---------- Supabase ----------
+const H = {apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'};
+async function sbGet(p){const r=await fetch(`${SUPABASE_URL}/rest/v1/${p}`,{headers:H});return r.json()}
+async function sbPost(t,b){const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}`,{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(b)});return r.json()}
+async function sbPatch(t,id,b){await fetch(`${SUPABASE_URL}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:H,body:JSON.stringify(b)})}
+async function sbDelete(t,id){await fetch(`${SUPABASE_URL}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H})}
+
+// ---------- Z-API ----------
+function limparTel(t){let n=(t||'').replace(/\D/g,'');if(n.length<=11&&!n.startsWith('55'))n='55'+n;return n}
+async function zapiTexto(tel,msg){
+  const r=await fetch(`https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}/send-text`,{
+    method:'POST',headers:{'Content-Type':'application/json','Client-Token':ZAPI_CLIENT_TOKEN},
+    body:JSON.stringify({phone:limparTel(tel),message:msg})});
+  if(!r.ok)throw new Error('Falha no envio');return r.json();
+}
+async function zapiMidia(tel,base64,tipo,legenda){
+  // endpoint varia por tipo
+  const map={imagem:'send-image',video:'send-video',documento:'send-document/pdf'};
+  const ep=map[tipo]||'send-image';
+  const campo=tipo==='imagem'?'image':tipo==='video'?'video':'document';
+  const body={phone:limparTel(tel),caption:legenda||''};
+  body[campo]=base64;
+  const r=await fetch(`https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}/${ep}`,{
+    method:'POST',headers:{'Content-Type':'application/json','Client-Token':ZAPI_CLIENT_TOKEN},
+    body:JSON.stringify(body)});
+  if(!r.ok)throw new Error('Falha no envio de mídia');return r.json();
+}
+
+// ---------- Init ----------
+async function iniciar(){
+  await carregarConversas();
+  pollInterval = setInterval(poll, 4000); // atualiza a cada 4s
+}
+async function poll(){
+  await carregarConversas(true);
+  if(conversaAtual) await carregarMensagens(conversaAtual.id, true);
+}
+
+async function carregarConversas(silencioso){
+  const data = await sbGet('conversas?arquivada=eq.false&order=ultima_em.desc');
+  if(Array.isArray(data)) conversas = data;
+  renderConversas();
+}
+
+function iniciais(nome){return (nome||'?').trim().split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+function horaCurta(ts){const d=new Date(ts);const h=new Date();return d.toDateString()===h.toDateString()?d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}
+
+function renderConversas(){
+  const busca=(document.getElementById('busca').value||'').toLowerCase();
+  const list=document.getElementById('convList');
+  const filt=conversas.filter(c=>(c.nome||c.telefone).toLowerCase().includes(busca)||c.telefone.includes(busca));
+  if(!filt.length){list.innerHTML='<div class="empty-list">Nenhuma conversa ainda</div>';return}
+  list.innerHTML=filt.map(c=>`
+    <div class="conv ${conversaAtual&&conversaAtual.id===c.id?'active':''}" onclick="abrirConversa('${c.id}')">
+      <div class="avatar">${c.foto?`<img src="${c.foto}">`:iniciais(c.nome||c.telefone)}</div>
+      <div class="conv-info">
+        <div class="conv-top">
+          <span class="conv-nome">${c.nome||c.telefone}</span>
+          <span class="conv-hora">${horaCurta(c.ultima_em)}</span>
+        </div>
+        <div class="conv-top">
+          <span class="conv-prev">${c.ultima_mensagem||''}</span>
+          ${c.nao_lidas>0?`<span class="badge">${c.nao_lidas}</span>`:''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function abrirConversa(id){
+  conversaAtual = conversas.find(c=>c.id===id);
+  if(!conversaAtual)return;
+  document.getElementById('chatEmpty').style.display='none';
+  document.getElementById('chatArea').style.display='flex';
+  document.getElementById('chatNome').textContent=conversaAtual.nome||conversaAtual.telefone;
+  document.getElementById('chatTel').textContent=conversaAtual.telefone;
+  document.getElementById('chatAvatar').innerHTML=conversaAtual.foto?`<img src="${conversaAtual.foto}">`:iniciais(conversaAtual.nome||conversaAtual.telefone);
+  // mobile: esconde sidebar
+  document.getElementById('sidebar').classList.add('hidden-mobile');
+  document.getElementById('chat').classList.remove('hidden-mobile');
+  // zera não lidas
+  if(conversaAtual.nao_lidas>0){await sbPatch('conversas',id,{nao_lidas:0});conversaAtual.nao_lidas=0;renderConversas()}
+  await carregarMensagens(id);
+}
+function voltarLista(){
+  document.getElementById('sidebar').classList.remove('hidden-mobile');
+  document.getElementById('chat').classList.add('hidden-mobile');
+}
+
+let ultimaMsgId=null;
+async function carregarMensagens(convId, silencioso){
+  const msgs=await sbGet(`mensagens?conversa_id=eq.${convId}&order=criado_em.asc`);
+  if(!Array.isArray(msgs))return;
+  // se silencioso e nada mudou, não re-renderiza (evita piscar)
+  const lastId=msgs.length?msgs[msgs.length-1].id:null;
+  if(silencioso && lastId===ultimaMsgId)return;
+  ultimaMsgId=lastId;
+  const body=document.getElementById('chatBody');
+  let ultimaData='';let html='';
+  msgs.forEach(m=>{
+    const d=new Date(m.criado_em).toLocaleDateString('pt-BR');
+    if(d!==ultimaData){html+=`<div class="date-sep">${d}</div>`;ultimaData=d}
+    html+=`<div class="bolha ${m.direcao}">${renderConteudo(m)}<small>${new Date(m.criado_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</small></div>`;
+  });
+  body.innerHTML=html;
+  body.scrollTop=body.scrollHeight;
+}
+function renderConteudo(m){
+  const txt=m.conteudo?`<div>${escapeHtml(m.conteudo)}</div>`:'';
+  if(m.tipo==='imagem'&&m.midia_url)return `<img src="${m.midia_url}">${txt}`;
+  if(m.tipo==='video'&&m.midia_url)return `<video controls src="${m.midia_url}"></video>${txt}`;
+  if(m.tipo==='audio'&&m.midia_url)return `<audio controls src="${m.midia_url}"></audio>${txt}`;
+  if(m.tipo==='documento'&&m.midia_url)return `<a class="doc" href="${m.midia_url}" target="_blank">📄 Documento</a>${txt}`;
+  if(m.tipo==='figurinha'&&m.midia_url)return `<img src="${m.midia_url}" style="max-width:120px">`;
+  return txt||'(mensagem)';
+}
+function escapeHtml(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+
+// ---------- Enviar ----------
+async function enviarTexto(){
+  const inp=document.getElementById('msgInput');
+  const msg=inp.value.trim();
+  if(!msg||!conversaAtual)return;
+  inp.value='';autoGrow(inp);
+  try{
+    await zapiTexto(conversaAtual.telefone,msg);
+    await sbPost('mensagens',{conversa_id:conversaAtual.id,telefone:conversaAtual.telefone,direcao:'enviada',tipo:'texto',conteudo:msg});
+    await sbPatch('conversas',conversaAtual.id,{ultima_mensagem:msg,ultima_em:new Date().toISOString()});
+    ultimaMsgId=null;await carregarMensagens(conversaAtual.id);await carregarConversas();
+  }catch(e){toast('Erro: '+e.message)}
+}
+
+async function enviarMidia(){
+  const file=document.getElementById('fileInput').files[0];
+  if(!file||!conversaAtual)return;
+  const tipo=file.type.startsWith('image')?'imagem':file.type.startsWith('video')?'video':'documento';
+  toast('Enviando mídia...');
+  const reader=new FileReader();
+  reader.onload=async()=>{
+    const base64=reader.result; // data:...;base64,xxx (Z-API aceita data URI)
+    try{
+      await zapiMidia(conversaAtual.telefone,base64,tipo,'');
+      await sbPost('mensagens',{conversa_id:conversaAtual.id,telefone:conversaAtual.telefone,direcao:'enviada',tipo,conteudo:'',midia_url:base64});
+      await sbPatch('conversas',conversaAtual.id,{ultima_mensagem:'📎 '+tipo,ultima_em:new Date().toISOString()});
+      ultimaMsgId=null;await carregarMensagens(conversaAtual.id);await carregarConversas();
+      toast('Mídia enviada');
+    }catch(e){toast('Erro: '+e.message)}
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('fileInput').value='';
+}
+
+// ---------- Nova conversa ----------
+function abrirNovaConversa(){['nc_nome','nc_tel','nc_msg'].forEach(i=>document.getElementById(i).value='');show('modalNova')}
+async function iniciarConversa(){
+  const nome=document.getElementById('nc_nome').value.trim();
+  const tel=limparTel(document.getElementById('nc_tel').value);
+  const msg=document.getElementById('nc_msg').value.trim();
+  if(!tel||!msg){toast('Telefone e mensagem são obrigatórios');return}
+  try{
+    await zapiTexto(tel,msg);
+    let conv=conversas.find(c=>c.telefone===tel);
+    if(!conv){const novo=await sbPost('conversas',{telefone:tel,nome,ultima_mensagem:msg,ultima_em:new Date().toISOString()});conv=Array.isArray(novo)?novo[0]:novo}
+    await sbPost('mensagens',{conversa_id:conv.id,telefone:tel,direcao:'enviada',tipo:'texto',conteudo:msg});
+    await sbPatch('conversas',conv.id,{ultima_mensagem:msg,ultima_em:new Date().toISOString()});
+    fechar('modalNova');await carregarConversas();abrirConversa(conv.id);toast('Mensagem enviada');
+  }catch(e){toast('Erro: '+e.message)}
+}
+
+// ---------- Agendamento ----------
+function abrirAgendar(){
+  if(!conversaAtual){toast('Abra uma conversa primeiro');return}
+  document.getElementById('agendarPara').textContent='Para: '+(conversaAtual.nome||conversaAtual.telefone);
+  document.getElementById('ag_msg').value='';
+  document.getElementById('ag_file').value='';
+  document.getElementById('ag_fileInfo').textContent='';
+  midiaAgendada=null;
+  show('modalAgendar');
+}
+
+let midiaAgendada=null; // {base64, tipo, nome}
+function prepararMidiaAgendada(){
+  const file=document.getElementById('ag_file').files[0];
+  const info=document.getElementById('ag_fileInfo');
+  if(!file){midiaAgendada=null;info.textContent='';return}
+  // limite ~4MB (base64 incha ~33%, Supabase aceita ~5MB por registro)
+  const limiteMB=4;
+  if(file.size > limiteMB*1024*1024){
+    info.textContent=`⚠ Arquivo muito grande (${(file.size/1024/1024).toFixed(1)}MB). Máximo ${limiteMB}MB para agendar.`;
+    midiaAgendada=null;
+    document.getElementById('ag_file').value='';
+    return;
+  }
+  const tipo=file.type.startsWith('image')?'imagem':file.type.startsWith('video')?'video':'documento';
+  const reader=new FileReader();
+  reader.onload=()=>{
+    midiaAgendada={base64:reader.result, tipo, nome:file.name};
+    info.textContent=`✓ ${file.name} (${(file.size/1024/1024).toFixed(1)}MB) anexado`;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function salvarAgendamento(){
+  const msg=document.getElementById('ag_msg').value.trim();
+  const data=document.getElementById('ag_data').value;
+  const hora=document.getElementById('ag_hora').value;
+  if(!data||!hora){toast('Preencha data e hora');return}
+  if(!msg && !midiaAgendada){toast('Escreva uma mensagem ou anexe uma mídia');return}
+  const enviar_em=new Date(`${data}T${hora}`).toISOString();
+  const registro={
+    telefone:conversaAtual.telefone,
+    nome:conversaAtual.nome,
+    conteudo:msg,
+    tipo: midiaAgendada ? midiaAgendada.tipo : 'texto',
+    midia_url: midiaAgendada ? midiaAgendada.base64 : null,
+    enviar_em
+  };
+  await sbPost('agendamentos',registro);
+  fechar('modalAgendar');toast('Mensagem agendada' + (midiaAgendada?' com mídia':''));
+  midiaAgendada=null;
+}
+async function abrirAgendamentos(){
+  const ags=await sbGet('agendamentos?enviada=eq.false&order=enviar_em.asc');
+  const body=document.getElementById('agListBody');
+  if(!Array.isArray(ags)||!ags.length){body.innerHTML='<p class="muted">Nenhuma mensagem agendada</p>'}
+  else body.innerHTML=ags.map(a=>`
+    <div class="agend-item">
+      <b>${a.nome||a.telefone}</b> · ${new Date(a.enviar_em).toLocaleString('pt-BR')}
+      ${a.midia_url?`<div style="margin-top:6px;font-size:12px;color:var(--ouro)">📎 ${a.tipo}</div>`:''}
+      <div style="margin-top:6px;font-size:13px">${escapeHtml(a.conteudo)}</div>
+      <button class="btn-ghost" style="margin-top:8px;color:var(--vermelho)" onclick="cancelarAgendamento('${a.id}')">Cancelar</button>
+    </div>`).join('');
+  show('modalAgList');
+}
+async function cancelarAgendamento(id){await sbDelete('agendamentos',id);abrirAgendamentos();toast('Agendamento cancelado')}
+
+// ---------- utils ----------
+function autoGrow(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px'}
+function show(id){document.getElementById(id).classList.add('show')}
+function fechar(id){document.getElementById(id).classList.remove('show')}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(window._t);window._t=setTimeout(()=>t.classList.remove('show'),3000)}
+</script>
+</body>
+</html>

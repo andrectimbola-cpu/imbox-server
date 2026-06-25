@@ -1,12 +1,17 @@
 // =====================================================
 // INBOX WHATSAPP - Serviço (Railway)
 // =====================================================
+// 1. Webhook da Z-API: recebe mensagens (texto e mídia),
+//    cria/atualiza a conversa e grava no Supabase.
+// 2. Agendador: envia mensagens agendadas na hora marcada.
+// =====================================================
+
 const express = require('express');
 const app = express();
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '25mb' })); // mídias podem ser grandes
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;        // service_role
 const ZAPI_INSTANCE = process.env.ZAPI_INSTANCE;
 const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
 const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN;
@@ -26,18 +31,35 @@ async function zapiTexto(tel,msg){
   return r.json();
 }
 
+async function zapiMidia(tel,base64,tipo,legenda,nomeArquivo){
+  const map={imagem:'send-image',video:'send-video',documento:'send-document/pdf'};
+  const ep=map[tipo]||'send-image';
+  const campo=tipo==='imagem'?'image':tipo==='video'?'video':'document';
+  const body={phone:limparTel(tel),caption:legenda||''};
+  body[campo]=base64;
+  if(tipo==='documento'&&nomeArquivo) body.fileName=nomeArquivo;
+  const r=await fetch(`https://api.z-api.io/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}/${ep}`,{
+    method:'POST',headers:{'Content-Type':'application/json','Client-Token':ZAPI_CLIENT_TOKEN},
+    body:JSON.stringify(body)});
+  return r.json();
+}
+
 // =====================================================
 // 1. WEBHOOK — recebe mensagens
+// Z-API → Webhook "Ao receber" → https://SEU-APP.railway.app/webhook
 // =====================================================
 app.post('/webhook', async (req,res)=>{
   res.sendStatus(200);
   try{
     const d = req.body;
-    const ehMinha = !!d.fromMe;
+    const ehMinha = !!d.fromMe;                  // true = enviada por você (pelo celular)
     const tel = limparTel(d.phone);
     if(!tel) return;
+    // Mensagens enviadas pelo próprio app já são gravadas na hora do envio.
+    // A Z-API marca as do app com fromApi=true → evita duplicar.
     if (ehMinha && (d.fromApi || d.fromAPI)) return;
 
+    // Identifica tipo e conteúdo
     let tipo='texto', conteudo='', midia_url=null;
     if(d.text?.message){ tipo='texto'; conteudo=d.text.message; }
     else if(d.image){ tipo='imagem'; midia_url=d.image.imageUrl; conteudo=d.image.caption||''; }
@@ -53,6 +75,7 @@ app.post('/webhook', async (req,res)=>{
     const agora = new Date().toISOString();
     const direcao = ehMinha ? 'enviada' : 'recebida';
 
+    // Acha ou cria a conversa
     let conv = (await sbGet(`conversas?telefone=eq.${tel}`))[0];
     if(!conv){
       const novo = await sbPost('conversas',{telefone:tel,nome,foto,ultima_mensagem:preview,ultima_em:agora,nao_lidas: ehMinha?0:1});
@@ -80,20 +103,27 @@ async function processarAgendamentos(){
     if(!Array.isArray(pendentes)||!pendentes.length)return;
     for(const a of pendentes){
       try{
-        await zapiTexto(a.telefone,a.conteudo);
+        const temMidia = a.midia_url && a.tipo && a.tipo!=='texto';
+        if(temMidia){
+          await zapiMidia(a.telefone, a.midia_url, a.tipo, a.conteudo||'', a.nome);
+        } else {
+          await zapiTexto(a.telefone, a.conteudo);
+        }
         await sbPatch('agendamentos',`id=eq.${a.id}`,{enviada:true});
+        // registra na conversa (cria se necessário)
         const tel=limparTel(a.telefone);
+        const preview = temMidia ? ('📎 '+a.tipo) : a.conteudo;
         let conv=(await sbGet(`conversas?telefone=eq.${tel}`))[0];
-        if(!conv){const n=await sbPost('conversas',{telefone:tel,nome:a.nome||tel,ultima_mensagem:a.conteudo,ultima_em:new Date().toISOString()});conv=Array.isArray(n)?n[0]:n;}
-        else await sbPatch('conversas',`id=eq.${conv.id}`,{ultima_mensagem:a.conteudo,ultima_em:new Date().toISOString()});
-        await sbPost('mensagens',{conversa_id:conv.id,telefone:tel,direcao:'enviada',tipo:'texto',conteudo:a.conteudo});
-        console.log(`Agendamento enviado para ${a.nome||tel}`);
+        if(!conv){const n=await sbPost('conversas',{telefone:tel,nome:a.nome||tel,ultima_mensagem:preview,ultima_em:new Date().toISOString()});conv=Array.isArray(n)?n[0]:n;}
+        else await sbPatch('conversas',`id=eq.${conv.id}`,{ultima_mensagem:preview,ultima_em:new Date().toISOString()});
+        await sbPost('mensagens',{conversa_id:conv.id,telefone:tel,direcao:'enviada',tipo:a.tipo||'texto',conteudo:a.conteudo,midia_url:temMidia?a.midia_url:null});
+        console.log(`Agendamento enviado para ${a.nome||tel}${temMidia?' (com mídia)':''}`);
         await new Promise(r=>setTimeout(r,3000));
       }catch(err){ console.error('Falha agendamento:',err.message); }
     }
   }catch(e){ console.error('Erro agendador:',e.message); }
 }
-setInterval(processarAgendamentos, 60*1000);
+setInterval(processarAgendamentos, 60*1000); // checa a cada 1 min
 processarAgendamentos();
 
 app.get('/',(req,res)=>res.send('Inbox WhatsApp — serviço ativo'));
